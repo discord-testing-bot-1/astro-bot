@@ -436,26 +436,21 @@ main{flex:1;padding:30px 32px;max-width:1180px;width:100%;margin:0 auto}
 <div id="toasts"></div>
 
 <script>
-// ── STATE ──────────────────────────────────────────────────────────────
 const PASS = "AstroAstro!";
 const SEC  = "AstroAstro!";
-
-// Restore saved API URL from localStorage (survives page refresh)
-const API = "https://astro-bot-production-7638.up.railway.app";
+const API  = "https://astro-bot-production-7638.up.railway.app";
 
 let GID = null, GINFO = null;
 let selRoles = {pr:[], sr:[]};
-let btnCount  = 0;
+let btnCount = 0;
+let _btnId = 0;
 
-// ── ANIMATED LOCK LINES ────────────────────────────────────────────────
 (()=>{
   const c = document.getElementById("llines");
   for(let i = 0; i < 14; i++){
     const l = document.createElement("div");
     l.className = "l-line";
-    l.style.cssText = `left:${Math.random()*100}%;height:${Math.random()*180+80}px;` +
-      `animation-duration:${Math.random()*8+4}s;animation-delay:${Math.random()*5}s;` +
-      `opacity:${Math.random()*.35+.05}`;
+    l.style.cssText = `left:${Math.random()*100}%;height:${Math.random()*180+80}px;animation-duration:${Math.random()*8+4}s;animation-delay:${Math.random()*5}s;opacity:${Math.random()*.35+.05}`;
     c.appendChild(l);
   }
 })();
@@ -471,7 +466,19 @@ function unlock(){
     document.getElementById("lock").classList.add("hide");
     document.getElementById("app").classList.add("on");
     setTimeout(() => document.getElementById("lock").remove(), 600);
-    // Auto-connect if we have a saved URL
+    autoConnect();
+  } else {
+    inp.classList.add("err");
+    err.textContent = "Incorrect password";
+    setTimeout(() => {
+      inp.classList.remove("err");
+      err.textContent = "";
+      inp.value = "";
+      inp.focus();
+    }, 1100);
+  }
+}
+
 async function autoConnect(){
   setDot("…");
   try{
@@ -485,15 +492,18 @@ async function autoConnect(){
   }
 }
 
-// ── API REQUEST HELPER ─────────────────────────────────────────────────
+function setDot(s){
+  const d = document.getElementById("sdot");
+  const t = document.getElementById("stxt");
+  d.className = "dot" + (s === "on" ? " on" : s === "off" ? " off" : "");
+  t.textContent = s === "on" ? "Online" : s === "off" ? "Offline" : "Connecting…";
+}
+
 async function req(path, method = "GET", body = null){
   const base = API.replace(/\/+$/, "");
   const opts = {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Secret": SEC,
-    },
+    headers: {"Content-Type": "application/json", "X-API-Secret": SEC},
   };
   if(body) opts.body = JSON.stringify(body);
   const r = await fetch(base + path, opts);
@@ -505,43 +515,15 @@ async function req(path, method = "GET", body = null){
   return r.json();
 }
 
-// ── CONNECT ────────────────────────────────────────────────────────────
-async function connect(){
-  const u = document.getElementById("apiUrl").value.trim().replace(/\/+$/, "");
-  if(!u){ toast("Enter your Railway URL", "e"); return; }
-  API = u;
-  try { localStorage.setItem("ab_api", API); } catch(_){}
-  setDot("…");
-  try{
-    await req("/api/ping");
-    setDot("on");
-    toast("Connected ✓", "s");
-    loadStats();
-    loadGuilds();
-  } catch(e){
-    setDot("off");
-    toast("Cannot connect — check the URL and make sure your bot is running", "e");
-  }
-}
-
-function setDot(s){
-  const d = document.getElementById("sdot");
-  const t = document.getElementById("stxt");
-  d.className = "dot" + (s === "on" ? " on" : s === "off" ? " off" : "");
-  t.textContent = s === "on" ? "Online" : s === "off" ? "Offline" : "Connecting…";
-}
-
-// ── NAVIGATION ─────────────────────────────────────────────────────────
 function pg(id, btn){
   document.querySelectorAll(".page").forEach(p => p.classList.remove("on"));
-  document.querySelectorAll(".tab").forEach(t  => t.classList.remove("on"));
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("on"));
   document.getElementById("page-" + id).classList.add("on");
   btn.classList.add("on");
   if(id === "panels"  && GID) loadPanels();
   if(id === "tickets" && GID) loadTickets();
 }
 
-// ── STATS ──────────────────────────────────────────────────────────────
 async function loadStats(){
   try{
     const s = await req("/api/stats");
@@ -554,7 +536,6 @@ async function loadStats(){
   } catch(_){}
 }
 
-// ── GUILDS ─────────────────────────────────────────────────────────────
 async function loadGuilds(){
   try{
     const gs = await req("/api/guilds");
@@ -565,16 +546,10 @@ async function loadGuilds(){
 
 function renderGuilds(gs, id){
   const c = document.getElementById(id);
-  if(!gs.length){
-    c.innerHTML = `<div class="empty"><div class="empty-ico">🌐</div><div class="empty-txt">No servers found</div></div>`;
-    return;
-  }
+  if(!gs.length){ c.innerHTML = `<div class="empty"><div class="empty-ico">🌐</div><div class="empty-txt">No servers found</div></div>`; return; }
   c.innerHTML = gs.map(g => `
     <div class="srvcard${g.id === GID ? " sel" : ""}" onclick="selGuild('${g.id}', ${JSON.stringify(g.name)})">
-      <div class="srvicon">${g.icon
-        ? `<img src="${g.icon}" loading="lazy" onerror="this.parentNode.textContent='${esc(g.name[0])}'">` 
-        : esc(g.name[0])}
-      </div>
+      <div class="srvicon">${g.icon ? `<img src="${g.icon}" loading="lazy" onerror="this.parentNode.textContent='${esc(g.name[0])}'">` : esc(g.name[0])}</div>
       <div class="srvname">${esc(g.name)}</div>
       <div class="srvsub">${g.member_count.toLocaleString()} members</div>
     </div>`).join("");
@@ -583,7 +558,6 @@ function renderGuilds(gs, id){
 async function selGuild(id, name){
   GID = id;
   toast("Selected: " + name, "i");
-  // highlight selected card everywhere
   document.querySelectorAll(".srvcard").forEach(c => {
     c.classList.toggle("sel", c.querySelector(".srvname")?.textContent === name);
   });
@@ -592,22 +566,17 @@ async function selGuild(id, name){
     document.getElementById("panels-gname").textContent  = GINFO.name;
     document.getElementById("tickets-gname").textContent = GINFO.name;
     document.getElementById("newPanelBtn").disabled = false;
-    // populate tools channel selector
-    const tc = document.getElementById("tool-ch");
-    tc.innerHTML = GINFO.channels.map(c => `<option value="${c.id}">#${esc(c.name)}</option>`).join("");
+    document.getElementById("tool-ch").innerHTML = GINFO.channels.map(c => `<option value="${c.id}">#${esc(c.name)}</option>`).join("");
     loadPanels();
     loadTickets();
-  } catch(e){
-    toast("Failed to load server info: " + e.message, "e");
-  }
+  } catch(e){ toast("Failed to load server info: " + e.message, "e"); }
 }
 
-// ── PANELS ─────────────────────────────────────────────────────────────
 async function loadPanels(){
   if(!GID) return;
   try{
     const info = await req("/api/guild/" + GID + "/info");
-    GINFO = info; // keep in sync
+    GINFO = info;
     renderPanels(info.panels || {});
   } catch(_){}
 }
@@ -615,18 +584,13 @@ async function loadPanels(){
 function renderPanels(panels){
   const list = document.getElementById("plist");
   const entries = Object.entries(panels);
-  if(!entries.length){
-    list.innerHTML = `<div class="empty"><div class="empty-ico">📋</div><div class="empty-txt">No panels yet — create one!</div></div>`;
-    return;
-  }
+  if(!entries.length){ list.innerHTML = `<div class="empty"><div class="empty-ico">📋</div><div class="empty-txt">No panels yet — create one!</div></div>`; return; }
   list.innerHTML = entries.map(([pid, p]) => `
     <div class="pitem">
       <div class="pinfo">
         <div class="pname">${esc(p.title)}</div>
         <div class="pmeta">#${getCh(p.channel_id)} · max ${p.max_tickets} ticket/user · ${(p.buttons||[]).length} button(s)</div>
-        <div class="ptags">${(p.buttons||[]).map(b =>
-          `<span class="ptag">${b.emoji ? b.emoji + " " : ""}${esc(b.label)}</span>`
-        ).join("")}</div>
+        <div class="ptags">${(p.buttons||[]).map(b => `<span class="ptag">${b.emoji ? b.emoji + " " : ""}${esc(b.label)}</span>`).join("")}</div>
       </div>
       <button class="btn btn-d btn-sm" onclick="delPanel('${pid}')">Delete</button>
     </div>`).join("");
@@ -634,28 +598,18 @@ function renderPanels(panels){
 
 async function delPanel(pid){
   if(!confirm("Delete this panel? The Discord message will also be removed.")) return;
-  try{
-    await req("/api/guild/" + GID + "/panels/" + pid, "DELETE");
-    toast("Panel deleted", "s");
-    loadPanels();
-  } catch(e){ toast("Failed: " + e.message, "e"); }
+  try{ await req("/api/guild/" + GID + "/panels/" + pid, "DELETE"); toast("Panel deleted", "s"); loadPanels(); }
+  catch(e){ toast("Failed: " + e.message, "e"); }
 }
 
-// ── TICKETS ────────────────────────────────────────────────────────────
 async function loadTickets(){
   if(!GID) return;
-  try{
-    const ts = await req("/api/guild/" + GID + "/tickets");
-    renderTickets(ts);
-  } catch(_){}
+  try{ const ts = await req("/api/guild/" + GID + "/tickets"); renderTickets(ts); } catch(_){}
 }
 
 function renderTickets(ts){
   const list = document.getElementById("tlist");
-  if(!ts.length){
-    list.innerHTML = `<div class="empty"><div class="empty-ico">🎫</div><div class="empty-txt">No open tickets</div></div>`;
-    return;
-  }
+  if(!ts.length){ list.innerHTML = `<div class="empty"><div class="empty-ico">🎫</div><div class="empty-txt">No open tickets</div></div>`; return; }
   list.innerHTML = ts.map(t => `
     <div class="titem">
       <div class="tdot"></div>
@@ -669,14 +623,10 @@ function renderTickets(ts){
 
 async function closeTicket(cid){
   if(!confirm("Close and delete this ticket?")) return;
-  try{
-    await req("/api/guild/" + GID + "/tickets/" + cid + "/close", "POST");
-    toast("Ticket closed", "s");
-    setTimeout(loadTickets, 1800);
-  } catch(e){ toast("Failed: " + e.message, "e"); }
+  try{ await req("/api/guild/" + GID + "/tickets/" + cid + "/close", "POST"); toast("Ticket closed", "s"); setTimeout(loadTickets, 1800); }
+  catch(e){ toast("Failed: " + e.message, "e"); }
 }
 
-// ── MODAL ──────────────────────────────────────────────────────────────
 function openModal(){
   if(!GID || !GINFO){ toast("Select a server first", "e"); return; }
   document.getElementById("m-title").value = "";
@@ -686,31 +636,23 @@ function openModal(){
   btnCount = 0;
   document.getElementById("bbuilder").innerHTML = "";
   document.getElementById("badd").style.display = "";
-  // populate channels
-  document.getElementById("m-ch").innerHTML =
-    GINFO.channels.map(c => `<option value="${c.id}">#${esc(c.name)}</option>`).join("");
-  // populate role pickers
+  document.getElementById("m-ch").innerHTML = GINFO.channels.map(c => `<option value="${c.id}">#${esc(c.name)}</option>`).join("");
   buildMsDd("pr", GINFO.roles);
   buildMsDd("sr", GINFO.roles);
   updateMsDisp("pr");
   updateMsDisp("sr");
-  // start with one button
   addBtn();
   document.getElementById("modal").classList.add("on");
 }
 
-function closeModal(){
-  document.getElementById("modal").classList.remove("on");
-}
+function closeModal(){ document.getElementById("modal").classList.remove("on"); }
 
 document.getElementById("modal").addEventListener("click", e => {
   if(e.target === e.currentTarget) closeModal();
 });
 
-// ── MULTI-SELECT ROLE PICKER ───────────────────────────────────────────
 function buildMsDd(key, roles){
-  const dd = document.getElementById(key + "-dd");
-  dd.innerHTML = roles.map(r => `
+  document.getElementById(key + "-dd").innerHTML = roles.map(r => `
     <div class="ms-item" id="${key}-${r.id}" onclick="toggleRole('${key}','${r.id}',${JSON.stringify(r.name)})">
       <div class="ms-chk">✓</div><span>${esc(r.name)}</span>
     </div>`).join("");
@@ -720,14 +662,14 @@ function toggleMs(key){
   const dd = document.getElementById(key + "-dd");
   const dp = document.getElementById(key + "-disp");
   const open = dd.classList.contains("open");
-  document.querySelectorAll(".ms-dd").forEach(d  => d.classList.remove("open"));
+  document.querySelectorAll(".ms-dd").forEach(d => d.classList.remove("open"));
   document.querySelectorAll(".ms-disp").forEach(d => d.classList.remove("open"));
   if(!open){ dd.classList.add("open"); dp.classList.add("open"); }
 }
 
 document.addEventListener("click", e => {
   if(!e.target.closest(".ms-wrap")){
-    document.querySelectorAll(".ms-dd").forEach(d  => d.classList.remove("open"));
+    document.querySelectorAll(".ms-dd").forEach(d => d.classList.remove("open"));
     document.querySelectorAll(".ms-disp").forEach(d => d.classList.remove("open"));
   }
 });
@@ -735,8 +677,7 @@ document.addEventListener("click", e => {
 function toggleRole(key, id, name){
   const arr = selRoles[key];
   const idx = arr.findIndex(r => r.id === id);
-  if(idx === -1) arr.push({id, name});
-  else arr.splice(idx, 1);
+  if(idx === -1) arr.push({id, name}); else arr.splice(idx, 1);
   updateMsDisp(key);
   document.getElementById(key + "-" + id)?.classList.toggle("sel", idx === -1);
 }
@@ -749,15 +690,12 @@ function removeRole(key, id, e){
 }
 
 function updateMsDisp(key){
-  const dp  = document.getElementById(key + "-disp");
+  const dp = document.getElementById(key + "-disp");
   const arr = selRoles[key];
   dp.innerHTML = arr.length
     ? arr.map(r => `<span class="ms-tag">${esc(r.name)}<span class="x" onclick="removeRole('${key}','${r.id}',event)">×</span></span>`).join("")
     : `<span class="ms-ph">Select roles…</span>`;
 }
-
-// ── BUTTON BUILDER ──────────────────────────────────────────────────────
-let _btnId = 0; // unique id counter (survives removes)
 
 function addBtn(){
   const bb = document.getElementById("bbuilder");
@@ -777,7 +715,7 @@ function addBtn(){
       <div class="fg"><label class="fl">Emoji (optional)</label><input type="text" class="fi" id="be-${uid}" placeholder="e.g. 🎫"></div>
     </div>
     <div class="fg"><label class="fl">Embed Text Inside Ticket</label>
-      <textarea class="ft" id="bt-${uid}" placeholder="First message shown in the ticket channel when this button is used..."></textarea></div>`;
+      <textarea class="ft" id="bt-${uid}" placeholder="First message shown in the ticket channel..."></textarea></div>`;
   bb.appendChild(row);
   if(btnCount >= 5) document.getElementById("badd").style.display = "none";
 }
@@ -786,7 +724,6 @@ function remBtn(uid){
   document.getElementById("brow-" + uid)?.remove();
   btnCount = Math.max(0, btnCount - 1);
   document.getElementById("badd").style.display = "";
-  // renumber header labels
   document.querySelectorAll(".brow").forEach((r, n) => {
     r.querySelector(".brow-hd span").textContent = "Button " + (n + 1);
   });
@@ -797,12 +734,9 @@ async function submitPanel(){
   const desc  = document.getElementById("m-desc").value.trim();
   const ch    = document.getElementById("m-ch").value;
   const max   = parseInt(document.getElementById("m-max").value) || 1;
-
   if(!title){ toast("Panel title is required", "e"); return; }
-
   const buttons = [];
-  let hasError  = false;
-
+  let hasError = false;
   document.querySelectorAll(".brow").forEach((row, n) => {
     if(hasError) return;
     const uid   = row.id.replace("brow-", "");
@@ -812,27 +746,21 @@ async function submitPanel(){
     if(!label){ toast(`Button ${n+1} needs a label`, "e"); hasError = true; return; }
     buttons.push({ label, emoji: emoji || null, ticket_embed_text: txt });
   });
-
   if(hasError) return;
   if(!buttons.length){ toast("Add at least one button", "e"); return; }
-
   try{
     await req("/api/guild/" + GID + "/panels", "POST", {
-      title,
-      description: desc,
-      channel_id:  ch,
-      max_tickets: max,
-      ping_roles:  selRoles.pr.map(r => r.id),
+      title, description: desc, channel_id: ch, max_tickets: max,
+      ping_roles: selRoles.pr.map(r => r.id),
       staff_roles: selRoles.sr.map(r => r.id),
       buttons,
     });
-    toast("Panel created and posted in Discord! 🎉", "s");
+    toast("Panel created! 🎉", "s");
     closeModal();
     loadPanels();
   } catch(e){ toast("Failed: " + e.message, "e"); }
 }
 
-// ── TOOLS ──────────────────────────────────────────────────────────────
 async function sendMsg(){
   const ch  = document.getElementById("tool-ch").value;
   const msg = document.getElementById("tool-msg").value.trim();
@@ -844,46 +772,28 @@ async function sendMsg(){
   } catch(e){ toast("Failed: " + e.message, "e"); }
 }
 
-// ── HELPERS ────────────────────────────────────────────────────────────
-function getCh(id){
-  if(!GINFO) return id;
-  return GINFO.channels.find(c => c.id == id)?.name || id;
-}
+function getCh(id){ return GINFO?.channels.find(c => c.id == id)?.name || id; }
 
 function esc(s){
   if(!s) return "";
-  return String(s)
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;");
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
 function fdate(iso){
   if(!iso) return "Unknown";
-  try{
-    // API returns UTC without Z — add it so JS parses correctly
-    const ts = iso.includes("Z") || iso.includes("+") ? iso : iso + "Z";
-    return new Date(ts).toLocaleString();
-  } catch{ return iso; }
+  try{ const ts = iso.includes("Z") || iso.includes("+") ? iso : iso + "Z"; return new Date(ts).toLocaleString(); } catch{ return iso; }
 }
 
 function toast(msg, type = "i"){
-  const c  = document.getElementById("toasts");
+  const c = document.getElementById("toasts");
   const el = document.createElement("div");
   el.className = "toast " + type;
   el.innerHTML = `<span>${{s:"✓",e:"✕",i:"ℹ"}[type]||"ℹ"}</span><span>${msg}</span>`;
   c.appendChild(el);
-  setTimeout(() => {
-    el.style.animation = "tOut .25s ease forwards";
-    setTimeout(() => el.remove(), 250);
-  }, 3200);
+  setTimeout(() => { el.style.animation = "tOut .25s ease forwards"; setTimeout(() => el.remove(), 250); }, 3200);
 }
 
-// Auto-refresh every 30 s
-setInterval(() => {
-  if(API){ loadStats(); if(GID) loadTickets(); }
-}, 30000);
+setInterval(() => { loadStats(); if(GID) loadTickets(); }, 30000);
 </script>
 </body>
 </html>
