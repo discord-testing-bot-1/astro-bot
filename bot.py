@@ -1,6 +1,6 @@
 """
 AstroBot — Discord ticket bot + Flask API
-Railway: set DISCORD_TOKEN and API_SECRET env vars
+Railway env vars required: DISCORD_TOKEN, API_SECRET
 """
 import discord
 from discord.ext import commands
@@ -12,7 +12,7 @@ from functools import wraps
 # ──────────────────────────────────────────────────────
 #  CONFIG
 # ──────────────────────────────────────────────────────
-DATA_FILE     = "data.json"
+DATA_FILE     = os.path.join(os.path.dirname(__file__), "data.json")
 PORT          = int(os.environ.get("PORT", 5000))
 API_SECRET    = os.environ.get("API_SECRET", "AstroAstro!")
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN", "")
@@ -55,7 +55,7 @@ intents.members          = True
 
 bot = commands.Bot(command_prefix="?", intents=intents, help_command=None)
 
-# ── close helper ─────────────────────────────────────
+# ── Close helper ──────────────────────────────────────
 async def do_close(channel: discord.TextChannel, actor):
     data = load()
     g    = gd(data, channel.guild.id)
@@ -77,7 +77,7 @@ async def do_close(channel: discord.TextChannel, actor):
     except Exception:
         pass
 
-# ── ?close ───────────────────────────────────────────
+# ── ?close command ────────────────────────────────────
 @bot.command(name="close")
 async def cmd_close(ctx: commands.Context):
     data = load()
@@ -97,7 +97,7 @@ async def cmd_close(ctx: commands.Context):
         return
     await do_close(ctx.channel, ctx.author)
 
-# ── Close button ──────────────────────────────────────
+# ── Close button view ─────────────────────────────────
 class CloseView(discord.ui.View):
     def __init__(self, channel_id: int):
         super().__init__(timeout=None)
@@ -122,7 +122,7 @@ class CloseView(discord.ui.View):
             pass
         await do_close(interaction.channel, interaction.user)
 
-# ── Panel button ──────────────────────────────────────
+# ── Panel button view ─────────────────────────────────
 class PanelView(discord.ui.View):
     def __init__(self, panel_id: str, guild_id: int):
         super().__init__(timeout=None)
@@ -170,7 +170,7 @@ async def open_ticket(interaction: discord.Interaction, panel_id: str, btn_index
     user  = interaction.user
     guild = interaction.guild
 
-    # duplicate check
+    # Duplicate check
     user_open = [
         c for c, t in g["tickets"].items()
         if t.get("user_id") == user.id and str(t.get("panel_id")) == str(panel_id)
@@ -185,7 +185,7 @@ async def open_ticket(interaction: discord.Interaction, panel_id: str, btn_index
 
     await interaction.response.defer(ephemeral=True)
 
-    # permission overwrites
+    # Permission overwrites
     ow = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
         user: discord.PermissionOverwrite(
@@ -214,7 +214,11 @@ async def open_ticket(interaction: discord.Interaction, panel_id: str, btn_index
     num   = len(g["tickets"]) + 1
     sname = user.display_name.replace(" ", "-").lower()[:20]
     cname = f"ticket-{sname}-{num}"
-    cat   = discord.utils.get(guild.categories, name="Tickets")
+
+    # Create or find Tickets category
+    cat = discord.utils.get(guild.categories, name="Tickets")
+    if not cat:
+        cat = await guild.create_category("Tickets")
 
     ch = await guild.create_text_channel(name=cname, overwrites=ow, category=cat, reason="Ticket opened")
 
@@ -240,7 +244,7 @@ async def open_ticket(interaction: discord.Interaction, panel_id: str, btn_index
     await ch.send(content=pings, embed=embed, view=CloseView(ch.id))
     await interaction.followup.send(f"✅ Ticket opened: {ch.mention}", ephemeral=True)
 
-# ── on_ready ─────────────────────────────────────────
+# ── on_ready ──────────────────────────────────────────
 @bot.event
 async def on_ready():
     print(f"[BOT] Logged in as {bot.user} (ID: {bot.user.id})")
@@ -281,7 +285,6 @@ def add_cors(resp):
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
     return resp
 
-# OPTIONS pre-flight — single catch-all so every route supports it
 @api.before_request
 def handle_options():
     if request.method == "OPTIONS":
@@ -291,16 +294,16 @@ def handle_options():
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
         return resp
 
-# ── Health / root ────────────────────────────────────
+# ── Health ────────────────────────────────────────────
 @api.route("/", methods=["GET"])
 def root():
-    return jsonify({"status": "AstroBot API online", "version": "2.0"})
+    return jsonify({"status": "AstroBot API online", "version": "3.0"})
 
 @api.route("/api/ping", methods=["GET"])
 def ping():
     return jsonify({"ok": True, "ts": time.time()})
 
-# ── Stats ────────────────────────────────────────────
+# ── Stats ─────────────────────────────────────────────
 @api.route("/api/stats", methods=["GET"])
 @require_auth
 def stats():
@@ -315,7 +318,7 @@ def stats():
         "bot_id":       str(bot.user.id) if bot.user else None,
     })
 
-# ── Guilds ───────────────────────────────────────────
+# ── Guilds ────────────────────────────────────────────
 @api.route("/api/guilds", methods=["GET"])
 @require_auth
 def guilds():
@@ -329,7 +332,7 @@ def guilds():
         for g in bot.guilds
     ])
 
-# ── Guild detail ─────────────────────────────────────
+# ── Guild detail ──────────────────────────────────────
 @api.route("/api/guild/<gid>/info", methods=["GET"])
 @require_auth
 def guild_info(gid):
@@ -349,7 +352,7 @@ def guild_info(gid):
         "tickets":      g["tickets"],
     })
 
-# ── Create panel ─────────────────────────────────────
+# ── Create panel ──────────────────────────────────────
 @api.route("/api/guild/<gid>/panels", methods=["POST"])
 @require_auth
 def create_panel(gid):
@@ -372,7 +375,7 @@ def create_panel(gid):
     data = load()
     g    = gd(data, gid)
 
-    # unique panel id
+    # Unique panel id
     pid = str(len(g["panels"]) + 1)
     while pid in g["panels"]:
         pid = str(int(pid) + 1)
@@ -391,28 +394,38 @@ def create_panel(gid):
     g["panels"][pid] = panel
     save(data)
 
-    # post the embed to Discord (runs in bot event loop)
-    async def post_panel():
-        embed = discord.Embed(
-            title=panel["title"],
-            description=panel["description"],
-            color=0x111111,
-            timestamp=datetime.utcnow(),
-        )
-        embed.set_footer(text="Click a button below to open a ticket.")
-        view = PanelView(panel_id=pid, guild_id=int(gid))
-        bot.add_view(view)
-        msg = await ch.send(embed=embed, view=view)
-        # save message_id back
-        d2 = load()
-        if str(gid) in d2 and pid in d2[str(gid)]["panels"]:
-            d2[str(gid)]["panels"][pid]["message_id"] = msg.id
-            save(d2)
+    # Use a Future so Flask waits for the Discord message to actually send
+    # This fixes the race condition where the panel saved but embed never posted
+    future = asyncio.run_coroutine_threadsafe(_post_panel(gid, pid, panel, ch), bot.loop)
+    try:
+        future.result(timeout=15)  # wait up to 15s for Discord to confirm
+    except Exception as e:
+        print(f"[API] Panel post error: {e}")
+        # Panel is saved — Discord message just failed, not fatal
+        return jsonify({"success": True, "panel_id": pid, "warning": f"Saved but Discord post failed: {e}"})
 
-    asyncio.run_coroutine_threadsafe(post_panel(), bot.loop)
     return jsonify({"success": True, "panel_id": pid})
 
-# ── Delete panel ─────────────────────────────────────
+async def _post_panel(gid, pid, panel, ch):
+    """Post the panel embed+buttons to Discord and save the message_id."""
+    embed = discord.Embed(
+        title=panel["title"],
+        description=panel["description"] or None,
+        color=0x111111,
+        timestamp=datetime.utcnow(),
+    )
+    embed.set_footer(text="Click a button below to open a ticket.")
+    view = PanelView(panel_id=pid, guild_id=int(gid))
+    bot.add_view(view)
+    msg = await ch.send(embed=embed, view=view)
+    # Save message_id back to data
+    d2 = load()
+    if str(gid) in d2 and pid in d2[str(gid)]["panels"]:
+        d2[str(gid)]["panels"][pid]["message_id"] = msg.id
+        save(d2)
+    print(f"[BOT] Panel {pid} posted → message {msg.id} in #{ch.name}")
+
+# ── Delete panel ──────────────────────────────────────
 @api.route("/api/guild/<gid>/panels/<pid>", methods=["DELETE"])
 @require_auth
 def delete_panel(gid, pid):
@@ -463,7 +476,6 @@ def close_ticket(gid, cid):
         return jsonify({"error": "Guild not found"}), 404
     ch = guild.get_channel(int(cid))
     if not ch:
-        # channel already gone — clean up data
         data = load()
         g    = gd(data, gid)
         g["tickets"].pop(cid, None)
@@ -472,7 +484,7 @@ def close_ticket(gid, cid):
     asyncio.run_coroutine_threadsafe(do_close(ch, bot.user), bot.loop)
     return jsonify({"success": True})
 
-# ── Send message ─────────────────────────────────────
+# ── Send message ──────────────────────────────────────
 @api.route("/api/guild/<gid>/send", methods=["POST"])
 @require_auth
 def send_message(gid):
@@ -490,7 +502,6 @@ def send_message(gid):
 #  ENTRY POINT
 # ──────────────────────────────────────────────────────
 def run_flask():
-    # Disable Flask reloader/debugger — required inside a thread
     api.run(host="0.0.0.0", port=PORT, debug=False, use_reloader=False)
 
 if __name__ == "__main__":
