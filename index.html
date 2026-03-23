@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AstroBot Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070707;--bg2:#0e0e0e;--bg3:#161616;--bg4:#1f1f1f;
+  --b1:#252525;--b2:#303030;--b3:#3a3a3a;
+  --t1:#f2f2f2;--t2:#aaa;--t3:#555;
+  --white:#fff;--danger:#ff4455;--success:#3dffa0;--warn:#ffb347;
+  --mono:'JetBrains Mono',monospace;--sans:'Space Grotesk',sans-serif;
+  --r:10px;--r2:14px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--t1);overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E")}
+
+/* ─── LOCK ─── */
+#lock{position:fixed;inset:0;z-index:800;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity .5s,transform .5s}
+#lock.hide{opacity:0;transform:scale(1.05);pointer-events:none}
+.l-logo{font-size:2.6rem;font-weight:700;letter-spacing:-1.5px;color:var(--white)}
+.l-logo em{color:var(--t3);font-style:normal}
+.l-tag{font-size:.7rem;letter-spacing:4px;text-transform:uppercase;color:var(--t3)}
+.l-box{width:300px;display:flex;flex-direction:column;gap:10px}
+.l-input{background:var(--bg3);border:1px solid var(--b1);color:var(--t1);padding:13px 16px;
+  border-radius:var(--r);font-family:var(--mono);font-size:.9rem;letter-spacing:3px;
+  outline:none;transition:border-color .2s,box-shadow .2s;width:100%}
+.l-input:focus{border-color:var(--white);box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+.l-input.err{border-color:var(--danger);animation:shake .28s ease}
+.l-btn{background:var(--white);color:var(--bg);border:none;padding:13px;border-radius:var(--r);
+  font-family:var(--sans);font-weight:700;font-size:.85rem;letter-spacing:1px;
+  text-transform:uppercase;cursor:pointer;transition:opacity .2s,transform .15s}
+.l-btn:hover{opacity:.88;transform:translateY(-1px)}
+.l-err{font-size:.75rem;color:var(--danger);font-family:var(--mono);text-align:center;min-height:1rem}
+.l-lines{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.l-line{position:absolute;width:1px;background:linear-gradient(transparent,rgba(255,255,255,.04),transparent);animation:lfall linear infinite}
+@keyframes lfall{from{transform:translateY(-100vh)}to{transform:translateY(100vh)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+/* ─── APP ─── */
+#app{display:none;flex-direction:column;min-height:100vh}
+#app.on{display:flex;animation:fadeUp .4s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─── API BAR ─── */
+#apibar{background:var(--bg2);border-bottom:1px solid var(--b1);padding:9px 24px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#apibar label{font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:2px;white-space:nowrap}
+#apiUrl{background:var(--bg3);border:1px solid var(--b1);color:var(--t1);
+  padding:7px 12px;border-radius:7px;font-family:var(--mono);font-size:.74rem;
+  outline:none;flex:1;min-width:200px;max-width:340px;transition:border-color .2s}
+#apiUrl:focus{border-color:var(--b3)}
+.ab-btn{background:var(--bg4);border:1px solid var(--b1);color:var(--t2);
+  padding:7px 14px;border-radius:7px;font-size:.75rem;cursor:pointer;
+  transition:border-color .2s,color .2s;font-family:var(--sans);white-space:nowrap}
+.ab-btn:hover{border-color:var(--white);color:var(--white)}
+#statusWrap{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.72rem;color:var(--t3);margin-left:auto}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--t3);transition:background .3s,box-shadow .3s;flex-shrink:0}
+.dot.on{background:var(--success);box-shadow:0 0 7px var(--success)}
+.dot.off{background:var(--danger);box-shadow:0 0 7px var(--danger)}
+
+/* ─── NAV ─── */
+nav{background:var(--bg2);border-bottom:1px solid var(--b1);height:58px;
+  padding:0 28px;display:flex;align-items:center;gap:28px;position:sticky;top:0;z-index:100}
+.nav-logo{font-weight:700;font-size:1.05rem;letter-spacing:-.5px;color:var(--white);white-space:nowrap}
+.nav-logo em{color:var(--t3);font-style:normal}
+.nav-tabs{display:flex;gap:2px}
+.tab{background:none;border:none;color:var(--t3);padding:8px 15px;border-radius:7px;
+  font-size:.83rem;font-weight:500;cursor:pointer;font-family:var(--sans);
+  transition:color .2s,background .2s}
+.tab:hover{color:var(--t1);background:var(--bg3)}
+.tab.on{color:var(--white);background:var(--bg4)}
+#botBadge{font-family:var(--mono);font-size:.68rem;color:var(--t3);margin-left:auto;white-space:nowrap}
+
+/* ─── CONTENT ─── */
+main{flex:1;padding:30px 32px;max-width:1180px;width:100%;margin:0 auto}
+.page{display:none}
+.page.on{display:block;animation:fadeUp .25s ease}
+
+/* ─── STATS ─── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:28px}
+.scard{background:var(--bg2);border:1px solid var(--b1);border-radius:var(--r2);padding:22px 24px;
+  transition:border-color .2s,transform .2s}
+.scard:hover{border-color:var(--b2);transform:translateY(-2px)}
+.scard-label{font-size:.68rem;text-transform:uppercase;letter-spacing:2.5px;color:var(--t3);margin-bottom:8px}
+.scard-val{font-size:2.1rem;font-weight:700;font-family:var(--mono);color:var(--white);line-height:1}
+.scard-sub{font-size:.72rem;color:var(--t3);margin-top:5px}
+.sec-title{font-size:.66rem;text-transform:uppercase;letter-spacing:3px;color:var(--t3);
+  margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--b1)}
+
+/* ─── SERVER GRID ─── */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.srvcard{background:var(--bg2);border:1px solid var(--b1);border-radius:var(--r);
+  padding:16px 14px;text-align:center;cursor:pointer;
+  transition:border-color .2s,background .2s,transform .15s}
+.srvcard:hover{border-color:var(--b2);background:var(--bg3);transform:translateY(-2px)}
+.srvcard.sel{border-color:var(--white)}
+.srvicon{width:46px;height:46px;border-radius:50%;background:var(--bg4);
+  margin:0 auto 10px;display:flex;align-items:center;justify-content:center;
+  font-size:1.2rem;font-weight:700;overflow:hidden}
+.srvicon img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.srvname{font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srvsub{font-size:.7rem;color:var(--t3);margin-top:3px;font-family:var(--mono)}
+
+/* ─── PANELS ─── */
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.ph h2{font-size:1.35rem;font-weight:700}
+.ph-sub{font-size:.78rem;color:var(--t3);margin-top:3px}
+.plist{display:flex;flex-direction:column;gap:10px}
+.pitem{background:var(--bg2);border:1px solid var(--b1);border-radius:var(--r);
+  padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;
+  transition:border-color .2s}
+.pitem:hover{border-color:var(--b2)}
+.pinfo{flex:1;min-width:0}
+.pname{font-weight:600;font-size:.95rem;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pmeta{font-size:.72rem;color:var(--t3);margin-top:3px;font-family:var(--mono)}
+.ptags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.ptag{background:var(--bg4);border:1px solid var(--b1);color:var(--t2);
+  padding:2px 9px;border-radius:20px;font-size:.68rem}
+
+/* ─── TICKETS ─── */
+.tlist{display:flex;flex-direction:column;gap:9px}
+.titem{background:var(--bg2);border:1px solid var(--b1);border-radius:var(--r);
+  padding:15px 20px;display:flex;align-items:center;gap:14px;transition:border-color .2s}
+.titem:hover{border-color:var(--b2)}
+.tdot{width:8px;height:8px;border-radius:50%;background:var(--success);
+  box-shadow:0 0 6px var(--success);flex-shrink:0}
+.tinfo{flex:1}
+.tchan{font-family:var(--mono);font-size:.85rem;color:var(--white)}
+.tmeta{font-size:.72rem;color:var(--t3);margin-top:2px}
+
+/* ─── BUTTONS ─── */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:var(--r);
+  font-size:.82rem;font-weight:600;cursor:pointer;border:none;font-family:var(--sans);
+  transition:opacity .2s,transform .15s}
+.btn:hover{opacity:.85;transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-w{background:var(--white);color:var(--bg)}
+.btn-d{background:#1e0a0a;border:1px solid #3a1010;color:var(--danger)}
+.btn-g{background:var(--bg4);border:1px solid var(--b1);color:var(--t2)}
+.btn-sm{padding:6px 11px;font-size:.74rem}
+
+/* ─── MODAL ─── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);backdrop-filter:blur(6px);
+  z-index:400;display:none;align-items:flex-start;justify-content:center;
+  padding:36px 14px;overflow-y:auto}
+.overlay.on{display:flex;animation:fadeUp .2s ease}
+.modal{background:var(--bg2);border:1px solid var(--b2);border-radius:var(--r2);
+  width:100%;max-width:660px;overflow:hidden;animation:slideUp .22s ease;margin:auto}
+@keyframes slideUp{from{transform:translateY(18px);opacity:0}to{transform:translateY(0);opacity:1}}
+.mhead{padding:22px 26px 18px;border-bottom:1px solid var(--b1);
+  display:flex;align-items:center;justify-content:space-between}
+.mtitle{font-size:1.05rem;font-weight:700;color:var(--white)}
+.mclose{background:none;border:none;color:var(--t3);font-size:1.2rem;cursor:pointer;
+  transition:color .2s;padding:4px;line-height:1}
+.mclose:hover{color:var(--white)}
+.mbody{padding:26px;display:flex;flex-direction:column;gap:18px}
+.mfoot{padding:18px 26px;border-top:1px solid var(--b1);display:flex;justify-content:flex-end;gap:8px}
+
+/* ─── FORM ─── */
+.fg{display:flex;flex-direction:column;gap:7px}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fl{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--t3)}
+.fi,.fs,.ft{background:var(--bg3);border:1px solid var(--b1);color:var(--t1);
+  padding:10px 13px;border-radius:var(--r);font-family:var(--sans);font-size:.86rem;
+  outline:none;width:100%;transition:border-color .2s,box-shadow .2s}
+.fi:focus,.fs:focus,.ft:focus{border-color:var(--white);box-shadow:0 0 0 1px rgba(255,255,255,.07)}
+.fs{cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23555' d='M5 7L0 2h10z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;padding-right:28px}
+.fs option{background:var(--bg3)}
+.ft{resize:vertical;min-height:75px;line-height:1.55}
+.fhint{font-size:.68rem;color:var(--t3)}
+.divider{height:1px;background:var(--b1);margin:4px 0}
+
+/* ─── MULTI SELECT ─── */
+.ms-wrap{position:relative}
+.ms-disp{background:var(--bg3);border:1px solid var(--b1);border-radius:var(--r);
+  padding:7px 13px;min-height:40px;cursor:pointer;display:flex;flex-wrap:wrap;
+  gap:5px;align-items:center;transition:border-color .2s}
+.ms-disp:hover,.ms-disp.open{border-color:var(--white)}
+.ms-ph{color:var(--t3);font-size:.83rem}
+.ms-tag{background:var(--bg4);border:1px solid var(--b2);border-radius:20px;
+  padding:2px 9px;font-size:.72rem;color:var(--t2);display:flex;align-items:center;gap:5px}
+.ms-tag .x{cursor:pointer;color:var(--t3);line-height:1}
+.ms-tag .x:hover{color:var(--danger)}
+.ms-dd{position:absolute;top:calc(100% + 3px);left:0;right:0;background:var(--bg3);
+  border:1px solid var(--b2);border-radius:var(--r);max-height:190px;overflow-y:auto;
+  z-index:60;display:none}
+.ms-dd.open{display:block;animation:fadeUp .12s ease}
+.ms-item{padding:9px 13px;font-size:.83rem;cursor:pointer;display:flex;align-items:center;
+  gap:9px;transition:background .12s}
+.ms-item:hover{background:var(--bg4)}
+.ms-item.sel{color:var(--white)}
+.ms-chk{width:15px;height:15px;border:1px solid var(--b2);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;font-size:.65rem;flex-shrink:0}
+.ms-item.sel .ms-chk{background:var(--white);border-color:var(--white);color:var(--bg)}
+
+/* ─── BUTTON BUILDER ─── */
+.bbuilder{display:flex;flex-direction:column;gap:10px}
+.brow{background:var(--bg3);border:1px solid var(--b1);border-radius:var(--r);
+  padding:14px;display:flex;flex-direction:column;gap:11px;animation:fadeUp .18s ease}
+.brow-hd{display:flex;align-items:center;justify-content:space-between;
+  font-size:.68rem;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1px}
+.badd{border:1px dashed var(--b2);border-radius:var(--r);padding:12px;text-align:center;
+  cursor:pointer;color:var(--t3);font-size:.82rem;transition:border-color .2s,color .2s}
+.badd:hover{border-color:var(--white);color:var(--white)}
+
+/* ─── TOAST ─── */
+#toasts{position:fixed;bottom:20px;right:20px;z-index:9000;display:flex;flex-direction:column;gap:7px;pointer-events:none}
+.toast{background:var(--bg3);border:1px solid var(--b2);border-radius:var(--r);
+  padding:11px 16px;font-size:.82rem;color:var(--t1);display:flex;align-items:center;gap:9px;
+  max-width:300px;box-shadow:0 6px 28px rgba(0,0,0,.5);pointer-events:all;
+  animation:tIn .25s ease}
+.toast.s{border-left:3px solid var(--success)}
+.toast.e{border-left:3px solid var(--danger)}
+.toast.i{border-left:3px solid var(--white)}
+@keyframes tIn{from{transform:translateX(16px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes tOut{to{transform:translateX(16px);opacity:0}}
+
+/* ─── EMPTY ─── */
+.empty{text-align:center;padding:55px 20px;color:var(--t3)}
+.empty-ico{font-size:2.5rem;margin-bottom:10px;opacity:.5}
+.empty-txt{font-size:.85rem}
+
+/* ─── TOOLS ─── */
+.tool-card{background:var(--bg2);border:1px solid var(--b1);border-radius:var(--r2);
+  padding:24px;max-width:480px;display:flex;flex-direction:column;gap:14px}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
+
+@media(max-width:600px){
+  main{padding:16px}
+  .frow{grid-template-columns:1fr}
+  nav{padding:0 14px;gap:12px}
+  #botBadge{display:none}
+  #apiUrl{max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- LOCK SCREEN -->
+<div id="lock">
+  <div class="l-lines" id="llines"></div>
+  <div class="l-logo">Astro<em>Bot</em></div>
+  <div class="l-tag">Dashboard</div>
+  <div class="l-box">
+    <input type="password" class="l-input" id="lpass" placeholder="Password" autocomplete="off">
+    <button class="l-btn" onclick="unlock()">Enter</button>
+    <div class="l-err" id="lerr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- API BAR -->
+  <div id="apibar">
+    <label>Bot API URL</label>
+    <input type="text" id="apiUrl" placeholder="https://your-app.up.railway.app">
+    <button class="ab-btn" onclick="connect()">Connect</button>
+    <div id="statusWrap">
+      <div class="dot" id="sdot"></div>
+      <span id="stxt">Not connected</span>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-logo">Astro<em>Bot</em></div>
+    <div class="nav-tabs">
+      <button class="tab on"  onclick="pg('overview',this)">Overview</button>
+      <button class="tab"     onclick="pg('servers',this)">Servers</button>
+      <button class="tab"     onclick="pg('panels',this)">Panels</button>
+      <button class="tab"     onclick="pg('tickets',this)">Tickets</button>
+      <button class="tab"     onclick="pg('tools',this)">Tools</button>
+    </div>
+    <div id="botBadge">—</div>
+  </nav>
+
+  <main>
+
+    <!-- OVERVIEW -->
+    <div class="page on" id="page-overview">
+      <div class="stats">
+        <div class="scard">
+          <div class="scard-label">Servers</div>
+          <div class="scard-val" id="sv-guilds">—</div>
+          <div class="scard-sub">Connected</div>
+        </div>
+        <div class="scard">
+          <div class="scard-label">Panels</div>
+          <div class="scard-val" id="sv-panels">—</div>
+          <div class="scard-sub">Total</div>
+        </div>
+        <div class="scard">
+          <div class="scard-label">Open Tickets</div>
+          <div class="scard-val" id="sv-tickets">—</div>
+          <div class="scard-sub">Active now</div>
+        </div>
+        <div class="scard">
+          <div class="scard-label">Bot</div>
+          <div class="scard-val" style="font-size:1.3rem" id="sv-bot">—</div>
+          <div class="scard-sub" id="sv-botid">—</div>
+        </div>
+      </div>
+      <div class="sec-title">Servers</div>
+      <div class="sgrid" id="ov-servers"></div>
+    </div>
+
+    <!-- SERVERS -->
+    <div class="page" id="page-servers">
+      <div class="sec-title">All Servers</div>
+      <div class="sgrid" id="all-servers"></div>
+    </div>
+
+    <!-- PANELS -->
+    <div class="page" id="page-panels">
+      <div class="ph">
+        <div>
+          <h2>Ticket Panels</h2>
+          <div class="ph-sub" id="panels-gname">Select a server first</div>
+        </div>
+        <button class="btn btn-w" id="newPanelBtn" onclick="openModal()" disabled>+ New Panel</button>
+      </div>
+      <div class="plist" id="plist">
+        <div class="empty"><div class="empty-ico">📋</div><div class="empty-txt">Connect and select a server</div></div>
+      </div>
+    </div>
+
+    <!-- TICKETS -->
+    <div class="page" id="page-tickets">
+      <div class="ph">
+        <div>
+          <h2>Open Tickets</h2>
+          <div class="ph-sub" id="tickets-gname">Select a server first</div>
+        </div>
+        <button class="btn btn-g" onclick="loadTickets()">↻ Refresh</button>
+      </div>
+      <div class="tlist" id="tlist">
+        <div class="empty"><div class="empty-ico">🎫</div><div class="empty-txt">No open tickets</div></div>
+      </div>
+    </div>
+
+    <!-- TOOLS -->
+    <div class="page" id="page-tools">
+      <h2 style="margin-bottom:22px;font-size:1.35rem">Tools</h2>
+      <div class="tool-card">
+        <div class="sec-title">Send Message to Channel</div>
+        <div class="fg">
+          <label class="fl">Channel</label>
+          <select class="fs" id="tool-ch"><option>— select a server first —</option></select>
+        </div>
+        <div class="fg">
+          <label class="fl">Message</label>
+          <textarea class="ft" id="tool-msg" placeholder="Type your message..."></textarea>
+        </div>
+        <button class="btn btn-w" onclick="sendMsg()" style="width:fit-content">Send ↗</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- CREATE PANEL MODAL -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <div class="mhead">
+      <div class="mtitle">Create Ticket Panel</div>
+      <button class="mclose" onclick="closeModal()">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="frow">
+        <div class="fg">
+          <label class="fl">Panel Title</label>
+          <input type="text" class="fi" id="m-title" placeholder="e.g. Support Tickets">
+        </div>
+        <div class="fg">
+          <label class="fl">Post In Channel</label>
+          <select class="fs" id="m-ch"></select>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Panel Description</label>
+        <textarea class="ft" id="m-desc" placeholder="Text shown on the embed in Discord..."></textarea>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label class="fl">Max Tickets Per User</label>
+          <input type="number" class="fi" id="m-max" value="1" min="1" max="10">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Ping Roles On Open</label>
+        <div class="ms-wrap">
+          <div class="ms-disp" id="pr-disp" onclick="toggleMs('pr')">
+            <span class="ms-ph">Select roles…</span>
+          </div>
+          <div class="ms-dd" id="pr-dd"></div>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Staff Roles (Ticket Access)</label>
+        <div class="ms-wrap">
+          <div class="ms-disp" id="sr-disp" onclick="toggleMs('sr')">
+            <span class="ms-ph">Select roles…</span>
+          </div>
+          <div class="ms-dd" id="sr-dd"></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div>
+        <div class="fl" style="margin-bottom:10px">
+          Ticket Buttons <span style="color:var(--t3);font-weight:400;text-transform:none;letter-spacing:0">(max 5)</span>
+        </div>
+        <div class="bbuilder" id="bbuilder"></div>
+        <div class="badd" id="badd" onclick="addBtn()">+ Add Button</div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-g" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-w" onclick="submitPanel()">Create Panel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────
+const PASS = "AstroAstro!";
+const SEC  = "AstroAstro!";
+
+// Restore saved API URL from localStorage (survives page refresh)
+let API = "";
+try { API = localStorage.getItem("ab_api") || ""; } catch(_) {}
+
+let GID = null, GINFO = null;
+let selRoles = {pr:[], sr:[]};
+let btnCount  = 0;
+
+// ── ANIMATED LOCK LINES ────────────────────────────────────────────────
+(()=>{
+  const c = document.getElementById("llines");
+  for(let i = 0; i < 14; i++){
+    const l = document.createElement("div");
+    l.className = "l-line";
+    l.style.cssText = `left:${Math.random()*100}%;height:${Math.random()*180+80}px;` +
+      `animation-duration:${Math.random()*8+4}s;animation-delay:${Math.random()*5}s;` +
+      `opacity:${Math.random()*.35+.05}`;
+    c.appendChild(l);
+  }
+})();
+
+document.getElementById("lpass").addEventListener("keydown", e => {
+  if(e.key === "Enter") unlock();
+});
+
+function unlock(){
+  const inp = document.getElementById("lpass");
+  const err = document.getElementById("lerr");
+  if(inp.value === PASS){
+    document.getElementById("lock").classList.add("hide");
+    document.getElementById("app").classList.add("on");
+    setTimeout(() => document.getElementById("lock").remove(), 600);
+    // Auto-connect if we have a saved URL
+    if(API){
+      document.getElementById("apiUrl").value = API;
+      connect();
+    }
+  } else {
+    inp.classList.add("err");
+    err.textContent = "Incorrect password";
+    setTimeout(() => {
+      inp.classList.remove("err");
+      err.textContent = "";
+      inp.value = "";
+      inp.focus();
+    }, 1100);
+  }
+}
+
+// ── API REQUEST HELPER ─────────────────────────────────────────────────
+async function req(path, method = "GET", body = null){
+  const base = API.replace(/\/+$/, "");
+  const opts = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Secret": SEC,
+    },
+  };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(base + path, opts);
+  if(!r.ok){
+    let msg = r.statusText;
+    try { const j = await r.json(); msg = j.error || msg; } catch(_){}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+// ── CONNECT ────────────────────────────────────────────────────────────
+async function connect(){
+  const u = document.getElementById("apiUrl").value.trim().replace(/\/+$/, "");
+  if(!u){ toast("Enter your Railway URL", "e"); return; }
+  API = u;
+  try { localStorage.setItem("ab_api", API); } catch(_){}
+  setDot("…");
+  try{
+    await req("/api/ping");
+    setDot("on");
+    toast("Connected ✓", "s");
+    loadStats();
+    loadGuilds();
+  } catch(e){
+    setDot("off");
+    toast("Cannot connect — check the URL and make sure your bot is running", "e");
+  }
+}
+
+function setDot(s){
+  const d = document.getElementById("sdot");
+  const t = document.getElementById("stxt");
+  d.className = "dot" + (s === "on" ? " on" : s === "off" ? " off" : "");
+  t.textContent = s === "on" ? "Online" : s === "off" ? "Offline" : "Connecting…";
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────
+function pg(id, btn){
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("on"));
+  document.querySelectorAll(".tab").forEach(t  => t.classList.remove("on"));
+  document.getElementById("page-" + id).classList.add("on");
+  btn.classList.add("on");
+  if(id === "panels"  && GID) loadPanels();
+  if(id === "tickets" && GID) loadTickets();
+}
+
+// ── STATS ──────────────────────────────────────────────────────────────
+async function loadStats(){
+  try{
+    const s = await req("/api/stats");
+    document.getElementById("sv-guilds").textContent  = s.guilds;
+    document.getElementById("sv-panels").textContent  = s.total_panels;
+    document.getElementById("sv-tickets").textContent = s.open_tickets;
+    document.getElementById("sv-bot").textContent     = s.bot_name;
+    document.getElementById("sv-botid").textContent   = "ID: " + (s.bot_id || "—");
+    document.getElementById("botBadge").textContent   = s.bot_name;
+  } catch(_){}
+}
+
+// ── GUILDS ─────────────────────────────────────────────────────────────
+async function loadGuilds(){
+  try{
+    const gs = await req("/api/guilds");
+    renderGuilds(gs, "ov-servers");
+    renderGuilds(gs, "all-servers");
+  } catch(_){}
+}
+
+function renderGuilds(gs, id){
+  const c = document.getElementById(id);
+  if(!gs.length){
+    c.innerHTML = `<div class="empty"><div class="empty-ico">🌐</div><div class="empty-txt">No servers found</div></div>`;
+    return;
+  }
+  c.innerHTML = gs.map(g => `
+    <div class="srvcard${g.id === GID ? " sel" : ""}" onclick="selGuild('${g.id}', ${JSON.stringify(g.name)})">
+      <div class="srvicon">${g.icon
+        ? `<img src="${g.icon}" loading="lazy" onerror="this.parentNode.textContent='${esc(g.name[0])}'">` 
+        : esc(g.name[0])}
+      </div>
+      <div class="srvname">${esc(g.name)}</div>
+      <div class="srvsub">${g.member_count.toLocaleString()} members</div>
+    </div>`).join("");
+}
+
+async function selGuild(id, name){
+  GID = id;
+  toast("Selected: " + name, "i");
+  // highlight selected card everywhere
+  document.querySelectorAll(".srvcard").forEach(c => {
+    c.classList.toggle("sel", c.querySelector(".srvname")?.textContent === name);
+  });
+  try{
+    GINFO = await req("/api/guild/" + id + "/info");
+    document.getElementById("panels-gname").textContent  = GINFO.name;
+    document.getElementById("tickets-gname").textContent = GINFO.name;
+    document.getElementById("newPanelBtn").disabled = false;
+    // populate tools channel selector
+    const tc = document.getElementById("tool-ch");
+    tc.innerHTML = GINFO.channels.map(c => `<option value="${c.id}">#${esc(c.name)}</option>`).join("");
+    loadPanels();
+    loadTickets();
+  } catch(e){
+    toast("Failed to load server info: " + e.message, "e");
+  }
+}
+
+// ── PANELS ─────────────────────────────────────────────────────────────
+async function loadPanels(){
+  if(!GID) return;
+  try{
+    const info = await req("/api/guild/" + GID + "/info");
+    GINFO = info; // keep in sync
+    renderPanels(info.panels || {});
+  } catch(_){}
+}
+
+function renderPanels(panels){
+  const list = document.getElementById("plist");
+  const entries = Object.entries(panels);
+  if(!entries.length){
+    list.innerHTML = `<div class="empty"><div class="empty-ico">📋</div><div class="empty-txt">No panels yet — create one!</div></div>`;
+    return;
+  }
+  list.innerHTML = entries.map(([pid, p]) => `
+    <div class="pitem">
+      <div class="pinfo">
+        <div class="pname">${esc(p.title)}</div>
+        <div class="pmeta">#${getCh(p.channel_id)} · max ${p.max_tickets} ticket/user · ${(p.buttons||[]).length} button(s)</div>
+        <div class="ptags">${(p.buttons||[]).map(b =>
+          `<span class="ptag">${b.emoji ? b.emoji + " " : ""}${esc(b.label)}</span>`
+        ).join("")}</div>
+      </div>
+      <button class="btn btn-d btn-sm" onclick="delPanel('${pid}')">Delete</button>
+    </div>`).join("");
+}
+
+async function delPanel(pid){
+  if(!confirm("Delete this panel? The Discord message will also be removed.")) return;
+  try{
+    await req("/api/guild/" + GID + "/panels/" + pid, "DELETE");
+    toast("Panel deleted", "s");
+    loadPanels();
+  } catch(e){ toast("Failed: " + e.message, "e"); }
+}
+
+// ── TICKETS ────────────────────────────────────────────────────────────
+async function loadTickets(){
+  if(!GID) return;
+  try{
+    const ts = await req("/api/guild/" + GID + "/tickets");
+    renderTickets(ts);
+  } catch(_){}
+}
+
+function renderTickets(ts){
+  const list = document.getElementById("tlist");
+  if(!ts.length){
+    list.innerHTML = `<div class="empty"><div class="empty-ico">🎫</div><div class="empty-txt">No open tickets</div></div>`;
+    return;
+  }
+  list.innerHTML = ts.map(t => `
+    <div class="titem">
+      <div class="tdot"></div>
+      <div class="tinfo">
+        <div class="tchan">#${esc(t.channel_name)}</div>
+        <div class="tmeta">by ${esc(t.user_name || "Unknown")} · ${fdate(t.opened_at)}</div>
+      </div>
+      <button class="btn btn-d btn-sm" onclick="closeTicket('${t.channel_id}')">Close</button>
+    </div>`).join("");
+}
+
+async function closeTicket(cid){
+  if(!confirm("Close and delete this ticket?")) return;
+  try{
+    await req("/api/guild/" + GID + "/tickets/" + cid + "/close", "POST");
+    toast("Ticket closed", "s");
+    setTimeout(loadTickets, 1800);
+  } catch(e){ toast("Failed: " + e.message, "e"); }
+}
+
+// ── MODAL ──────────────────────────────────────────────────────────────
+function openModal(){
+  if(!GID || !GINFO){ toast("Select a server first", "e"); return; }
+  document.getElementById("m-title").value = "";
+  document.getElementById("m-desc").value  = "";
+  document.getElementById("m-max").value   = "1";
+  selRoles = {pr:[], sr:[]};
+  btnCount = 0;
+  document.getElementById("bbuilder").innerHTML = "";
+  document.getElementById("badd").style.display = "";
+  // populate channels
+  document.getElementById("m-ch").innerHTML =
+    GINFO.channels.map(c => `<option value="${c.id}">#${esc(c.name)}</option>`).join("");
+  // populate role pickers
+  buildMsDd("pr", GINFO.roles);
+  buildMsDd("sr", GINFO.roles);
+  updateMsDisp("pr");
+  updateMsDisp("sr");
+  // start with one button
+  addBtn();
+  document.getElementById("modal").classList.add("on");
+}
+
+function closeModal(){
+  document.getElementById("modal").classList.remove("on");
+}
+
+document.getElementById("modal").addEventListener("click", e => {
+  if(e.target === e.currentTarget) closeModal();
+});
+
+// ── MULTI-SELECT ROLE PICKER ───────────────────────────────────────────
+function buildMsDd(key, roles){
+  const dd = document.getElementById(key + "-dd");
+  dd.innerHTML = roles.map(r => `
+    <div class="ms-item" id="${key}-${r.id}" onclick="toggleRole('${key}','${r.id}',${JSON.stringify(r.name)})">
+      <div class="ms-chk">✓</div><span>${esc(r.name)}</span>
+    </div>`).join("");
+}
+
+function toggleMs(key){
+  const dd = document.getElementById(key + "-dd");
+  const dp = document.getElementById(key + "-disp");
+  const open = dd.classList.contains("open");
+  document.querySelectorAll(".ms-dd").forEach(d  => d.classList.remove("open"));
+  document.querySelectorAll(".ms-disp").forEach(d => d.classList.remove("open"));
+  if(!open){ dd.classList.add("open"); dp.classList.add("open"); }
+}
+
+document.addEventListener("click", e => {
+  if(!e.target.closest(".ms-wrap")){
+    document.querySelectorAll(".ms-dd").forEach(d  => d.classList.remove("open"));
+    document.querySelectorAll(".ms-disp").forEach(d => d.classList.remove("open"));
+  }
+});
+
+function toggleRole(key, id, name){
+  const arr = selRoles[key];
+  const idx = arr.findIndex(r => r.id === id);
+  if(idx === -1) arr.push({id, name});
+  else arr.splice(idx, 1);
+  updateMsDisp(key);
+  document.getElementById(key + "-" + id)?.classList.toggle("sel", idx === -1);
+}
+
+function removeRole(key, id, e){
+  e.stopPropagation();
+  selRoles[key] = selRoles[key].filter(r => r.id !== id);
+  updateMsDisp(key);
+  document.getElementById(key + "-" + id)?.classList.remove("sel");
+}
+
+function updateMsDisp(key){
+  const dp  = document.getElementById(key + "-disp");
+  const arr = selRoles[key];
+  dp.innerHTML = arr.length
+    ? arr.map(r => `<span class="ms-tag">${esc(r.name)}<span class="x" onclick="removeRole('${key}','${r.id}',event)">×</span></span>`).join("")
+    : `<span class="ms-ph">Select roles…</span>`;
+}
+
+// ── BUTTON BUILDER ──────────────────────────────────────────────────────
+let _btnId = 0; // unique id counter (survives removes)
+
+function addBtn(){
+  const bb = document.getElementById("bbuilder");
+  if(btnCount >= 5){ toast("Max 5 buttons", "e"); return; }
+  const uid = ++_btnId;
+  btnCount++;
+  const row = document.createElement("div");
+  row.className = "brow";
+  row.id = "brow-" + uid;
+  row.innerHTML = `
+    <div class="brow-hd">
+      <span>Button ${btnCount}</span>
+      <button class="btn btn-g btn-sm" onclick="remBtn(${uid})">Remove</button>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Label</label><input type="text" class="fi" id="bl-${uid}" placeholder="e.g. General Support" maxlength="80"></div>
+      <div class="fg"><label class="fl">Emoji (optional)</label><input type="text" class="fi" id="be-${uid}" placeholder="e.g. 🎫"></div>
+    </div>
+    <div class="fg"><label class="fl">Embed Text Inside Ticket</label>
+      <textarea class="ft" id="bt-${uid}" placeholder="First message shown in the ticket channel when this button is used..."></textarea></div>`;
+  bb.appendChild(row);
+  if(btnCount >= 5) document.getElementById("badd").style.display = "none";
+}
+
+function remBtn(uid){
+  document.getElementById("brow-" + uid)?.remove();
+  btnCount = Math.max(0, btnCount - 1);
+  document.getElementById("badd").style.display = "";
+  // renumber header labels
+  document.querySelectorAll(".brow").forEach((r, n) => {
+    r.querySelector(".brow-hd span").textContent = "Button " + (n + 1);
+  });
+}
+
+async function submitPanel(){
+  const title = document.getElementById("m-title").value.trim();
+  const desc  = document.getElementById("m-desc").value.trim();
+  const ch    = document.getElementById("m-ch").value;
+  const max   = parseInt(document.getElementById("m-max").value) || 1;
+
+  if(!title){ toast("Panel title is required", "e"); return; }
+
+  const buttons = [];
+  let hasError  = false;
+
+  document.querySelectorAll(".brow").forEach((row, n) => {
+    if(hasError) return;
+    const uid   = row.id.replace("brow-", "");
+    const label = document.getElementById("bl-" + uid)?.value.trim();
+    const emoji = document.getElementById("be-" + uid)?.value.trim() || null;
+    const txt   = document.getElementById("bt-" + uid)?.value.trim() || "Please describe your issue.";
+    if(!label){ toast(`Button ${n+1} needs a label`, "e"); hasError = true; return; }
+    buttons.push({ label, emoji: emoji || null, ticket_embed_text: txt });
+  });
+
+  if(hasError) return;
+  if(!buttons.length){ toast("Add at least one button", "e"); return; }
+
+  try{
+    await req("/api/guild/" + GID + "/panels", "POST", {
+      title,
+      description: desc,
+      channel_id:  ch,
+      max_tickets: max,
+      ping_roles:  selRoles.pr.map(r => r.id),
+      staff_roles: selRoles.sr.map(r => r.id),
+      buttons,
+    });
+    toast("Panel created and posted in Discord! 🎉", "s");
+    closeModal();
+    loadPanels();
+  } catch(e){ toast("Failed: " + e.message, "e"); }
+}
+
+// ── TOOLS ──────────────────────────────────────────────────────────────
+async function sendMsg(){
+  const ch  = document.getElementById("tool-ch").value;
+  const msg = document.getElementById("tool-msg").value.trim();
+  if(!ch || !msg){ toast("Select a channel and type a message", "e"); return; }
+  try{
+    await req("/api/guild/" + GID + "/send", "POST", {channel_id: ch, message: msg});
+    toast("Message sent!", "s");
+    document.getElementById("tool-msg").value = "";
+  } catch(e){ toast("Failed: " + e.message, "e"); }
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────
+function getCh(id){
+  if(!GINFO) return id;
+  return GINFO.channels.find(c => c.id == id)?.name || id;
+}
+
+function esc(s){
+  if(!s) return "";
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+
+function fdate(iso){
+  if(!iso) return "Unknown";
+  try{
+    // API returns UTC without Z — add it so JS parses correctly
+    const ts = iso.includes("Z") || iso.includes("+") ? iso : iso + "Z";
+    return new Date(ts).toLocaleString();
+  } catch{ return iso; }
+}
+
+function toast(msg, type = "i"){
+  const c  = document.getElementById("toasts");
+  const el = document.createElement("div");
+  el.className = "toast " + type;
+  el.innerHTML = `<span>${{s:"✓",e:"✕",i:"ℹ"}[type]||"ℹ"}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(() => {
+    el.style.animation = "tOut .25s ease forwards";
+    setTimeout(() => el.remove(), 250);
+  }, 3200);
+}
+
+// Auto-refresh every 30 s
+setInterval(() => {
+  if(API){ loadStats(); if(GID) loadTickets(); }
+}, 30000);
+</script>
+</body>
+</html>
