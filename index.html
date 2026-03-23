@@ -441,8 +441,7 @@ const PASS = "AstroAstro!";
 const SEC  = "AstroAstro!";
 
 // Restore saved API URL from localStorage (survives page refresh)
-let API = "";
-try { API = localStorage.getItem("ab_api") || ""; } catch(_) {}
+const API = "https://astro-bot-production-7638.up.railway.app";
 
 let GID = null, GINFO = null;
 let selRoles = {pr:[], sr:[]};
@@ -473,19 +472,16 @@ function unlock(){
     document.getElementById("app").classList.add("on");
     setTimeout(() => document.getElementById("lock").remove(), 600);
     // Auto-connect if we have a saved URL
-    if(API){
-      document.getElementById("apiUrl").value = API;
-      connect();
-    }
-  } else {
-    inp.classList.add("err");
-    err.textContent = "Incorrect password";
-    setTimeout(() => {
-      inp.classList.remove("err");
-      err.textContent = "";
-      inp.value = "";
-      inp.focus();
-    }, 1100);
+async function autoConnect(){
+  setDot("…");
+  try{
+    await req("/api/ping");
+    setDot("on");
+    loadStats();
+    loadGuilds();
+  } catch(e){
+    setDot("off");
+    toast("Bot offline — check Railway", "e");
   }
 }
 
